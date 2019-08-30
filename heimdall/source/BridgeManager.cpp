@@ -1114,43 +1114,54 @@ bool BridgeManager::SendFile(FILE *file, unsigned int destination, unsigned int 
 				Interface::PrintErrorSameLine("\n");
 				Interface::PrintError("Failed to receive file part response!\n");
 
-				for (int retry = 0; retry < 4; retry++)
-				{
-					Interface::PrintErrorSameLine("\n");
-					Interface::PrintError("Retrying...");
+// Patch to fix missing file response on Galaxy A3 2016 (A310F)
+// Patch from: https://github.com/Benjamin-Dobell/Heimdall/issues/347
+if (filePartIndex == 0)
+{
+    // Hack
+    success = true;
+    receivedPartIndex = filePartIndex;
+}
+else
+{
+    for (int retry = 0; retry < 4; ++retry)
+    {
+        Interface::PrintErrorSameLine("\n");
+        Interface::PrintError("Retrying...");
 
-					// Send
-					sendFilePartPacket = new SendFilePartPacket(file, fileTransferPacketSize);
-					success = SendPacket(sendFilePartPacket, kDefaultTimeoutSend, sendEmptyTransferFlags);
-					delete sendFilePartPacket;
+        // Send
+        sendFilePartPacket = new SendFilePartPacket(file, fileTransferPacketSize);
+        success = SendPacket(sendFilePartPacket, kDefaultTimeoutSend, sendEmptyTransferFlags);
+        delete sendFilePartPacket;
 
-					if (!success)
-					{
-						Interface::PrintErrorSameLine("\n");
-						Interface::PrintError("Failed to send file part packet!\n");
-						return (false);
-					}
+        if (!success)
+        {
+            Interface::PrintErrorSameLine("\n");
+            Interface::PrintError("Failed to send file part packet 2!\n");
+            return (false);
+        }
 
-					// Response
-					sendFilePartResponse = new SendFilePartResponse();
-					success = ReceivePacket(sendFilePartResponse);
-					unsigned int receivedPartIndex = sendFilePartResponse->GetPartIndex();
+        // Response
+        sendFilePartResponse = new SendFilePartResponse();
+        success = ReceivePacket(sendFilePartResponse);
+        unsigned int receivedPartIndex = sendFilePartResponse->GetPartIndex();
 
-					delete sendFilePartResponse;
+        delete sendFilePartResponse;
 
-					if (receivedPartIndex != filePartIndex)
-					{
-						Interface::PrintErrorSameLine("\n");
-						Interface::PrintError("Expected file part index: %d Received: %d\n", filePartIndex, receivedPartIndex);
-						return (false);
-					}
+        if (receivedPartIndex != filePartIndex)
+        {
+            Interface::PrintErrorSameLine("\n");
+            Interface::PrintError("Expected file part index: %d Received: %d\n", filePartIndex, receivedPartIndex);
+            return (false);
+        }
 
-					if (success)
-						break;
-				}
+        if (success)
+            break;
+    }
 
-				if (!success)
-					return (false);
+    if (!success)
+        return (false);
+}
 			}
 
 			if (receivedPartIndex != filePartIndex)
